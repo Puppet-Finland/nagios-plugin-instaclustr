@@ -31,7 +31,7 @@ class InstaClustrMetrics
   end
 
   def nagios_print_critical
-    print "CRITICAL - Kafka consumer lag #{consumerlag_value} for topic #{topic}"
+    print "CRITICAL - Kafka consumer lag #{consumerlag_value} for topic #{topic} "
     print "exceeds the threshold of #{crit_threshold}! | consumer_lag=#{consumerlag_value};;;;\n"
     exit 2
   end
