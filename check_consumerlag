@@ -48,7 +48,9 @@ class InstaClustrMetrics
   end
 
   def help
-    puts 'Usage: check_consumerlag <arguments>'
+    print 'Usage: ./check_consumerlag -H api.instaclustr.com -w 300 -c 600 -u <instaclustr-username> -p <password> '
+    print '-C <cluster-id> -g <consumer-group> -t <topic> -i <client-id>'
+    exit 0
   end
 end
 
