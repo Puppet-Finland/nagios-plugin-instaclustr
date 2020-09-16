@@ -1,73 +1,72 @@
 #!/usr/bin/ruby
+# frozen_string_literal: true
 
 require 'rest-client'
 require 'json'
 require 'getoptlong'
 
 class InstaClustrMetrics
-
   attr_accessor :consumerlag_value, :timeout, :hostname, :user, :password, :warn_threshold, :crit_threshold
 
   # See https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
   attr_accessor :cluster_id, :consumer_group, :client_id, :topic
 
   def connect(
-        cluster_id: self.cluster_id,
-        consumer_group: self.consumer_group,
-        topic: self.topic,
-        metrics: 'consumerLag',
-        client_id: self.client_id,
-        user: self.user,
-        password: self.password,
-        verify_ssl: true,
-        hostname: self.hostname
-      )
-    
+    cluster_id: self.cluster_id,
+    consumer_group: self.consumer_group,
+    topic: self.topic,
+    metrics: 'consumerLag',
+    client_id: self.client_id,
+    user: self.user,
+    password: self.password,
+    hostname: self.hostname
+  )
+
     response = RestClient::Request.new(
-      :method => :get,
-      :url => "https://#{hostname}/monitoring/v1/clusters/#{cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{client_id}",
-      :user => user,
-      :password => password,
-      :verify_ssl => true,
+      method: :get,
+      url: "https://#{hostname}/monitoring/v1/clusters/#{cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{client_id}",
+      user: user,
+      password: password,
+      verify_ssl: true
     ).execute
-    
+
     results = JSON.parse(response.to_str)
     self.consumerlag_value = results[0]['payload'][0]['values'][0]['value'].to_i
   end
-  
-  def get_lag()
+
+  def get_lag
     connect
-    return self.consumerlag_value
+    consumerlag_value
   end
-  
+
   def nagios_print(status)
     if status == 'critical'
-      puts "CRITICAL - Kafka consumer lag #{self.consumerlag_value} for topic #{self.topic} exceeds the threshold of #{self.crit_threshold}! | consumer_lag=#{self.consumerlag_value};;;;"
+      puts "CRITICAL - Kafka consumer lag #{consumerlag_value} for topic #{topic} exceeds the threshold of #{crit_threshold}! | consumer_lag=#{consumerlag_value};;;;"
       exit 2
     elsif status == 'warning'
-      puts "WARNING - Kafka consumer lag #{self.consumerlag_value} for topic #{self.topic} exceeds the threshold of #{self.warn_threshold}! | consumer_lag=#{self.consumerlag_value};;;;"
+      puts "WARNING - Kafka consumer lag #{consumerlag_value} for topic #{topic} exceeds the threshold of #{warn_threshold}! | consumer_lag=#{consumerlag_value};;;;"
       exit 1
     else
-      puts "OK - Kafka consumer lag is #{self.consumerlag_value} for topic #{self.topic} | consumer_lag=#{self.consumerlag_value};;;;"
+      puts "OK - Kafka consumer lag is #{consumerlag_value} for topic #{topic} | consumer_lag=#{consumerlag_value};;;;"
     end
   end
-  
+
   def help
-    puts "Usage: check_consumerlag <arguments>"
+    puts 'Usage: check_consumerlag <arguments>'
   end
 end
 
 opts = GetoptLong.new(
-  [ '--hostname', '-H', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--help', '-h', GetoptLong::NO_ARGUMENT ],
-  [ '--warning', '-w', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--critical', '-c', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--user', '-u', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--password', '-p', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--cluster_id', '-C', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--consumer_group', '-g', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--client_id', '-i', GetoptLong::REQUIRED_ARGUMENT ],
-  [ '--topic', '-t', GetoptLong::REQUIRED_ARGUMENT ]
+  ['--hostname', '-H', GetoptLong::REQUIRED_ARGUMENT],
+  ['--help', '-h', GetoptLong::NO_ARGUMENT],
+  ['--warning', '-w', GetoptLong::REQUIRED_ARGUMENT],
+  ['--critical', '-c', GetoptLong::REQUIRED_ARGUMENT],
+  ['--user', '-u', GetoptLong::REQUIRED_ARGUMENT],
+  ['--password', '-p', GetoptLong::REQUIRED_ARGUMENT],
+  ['--cluster_id', '-C', GetoptLong::REQUIRED_ARGUMENT],
+  ['--consumer_group', '-g', GetoptLong::REQUIRED_ARGUMENT],
+  ['--client_id', '-i', GetoptLong::REQUIRED_ARGUMENT],
+  ['--topic', '-t', GetoptLong::REQUIRED_ARGUMENT]
 )
 
 i = InstaClustrMetrics.new
@@ -106,4 +105,3 @@ elsif i.get_lag > i.warn_threshold
 else
   i.nagios_print('normal')
 end
-
