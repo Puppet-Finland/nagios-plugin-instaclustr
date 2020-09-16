@@ -12,22 +12,12 @@ class InstaClustrMetrics
   # See https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
   attr_accessor :cluster_id, :consumer_group, :client_id, :topic
 
-  def connect(
-    cluster_id: self.cluster_id,
-    consumer_group: self.consumer_group,
-    topic: self.topic,
-    metrics: 'consumerLag',
-    client_id: self.client_id,
-    user: self.user,
-    password: self.password,
-    hostname: self.hostname
-  )
-
+  def connect(metrics)
     response = RestClient::Request.new(
       method: :get,
-      url: "https://#{hostname}/monitoring/v1/clusters/#{cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{client_id}", # rubocop:disable Metrics/LineLength
-      user: user,
-      password: password,
+      url: "https://#{@hostname}/monitoring/v1/clusters/#{@cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{@consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{@client_id}", # rubocop:disable Layout/LineLength
+      user: @user,
+      password: @password,
       verify_ssl: true
     ).execute
 
@@ -36,7 +26,7 @@ class InstaClustrMetrics
   end
 
   def lag
-    connect
+    connect('consumerlag')
     consumerlag_value
   end
 
