@@ -5,6 +5,7 @@ require 'rest-client'
 require 'json'
 require 'getoptlong'
 
+# Nagios plugin for getting metrics from InstaClustr
 class InstaClustrMetrics
   attr_accessor :consumerlag_value, :timeout, :hostname, :user, :password, :warn_threshold, :crit_threshold
 
@@ -24,7 +25,7 @@ class InstaClustrMetrics
 
     response = RestClient::Request.new(
       method: :get,
-      url: "https://#{hostname}/monitoring/v1/clusters/#{cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{client_id}",
+      url: "https://#{hostname}/monitoring/v1/clusters/#{cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{client_id}", # rubocop:disable Metrics/LineLength
       user: user,
       password: password,
       verify_ssl: true
@@ -34,21 +35,26 @@ class InstaClustrMetrics
     self.consumerlag_value = results[0]['payload'][0]['values'][0]['value'].to_i
   end
 
-  def get_lag
+  def lag
     connect
     consumerlag_value
   end
 
-  def nagios_print(status)
-    if status == 'critical'
-      puts "CRITICAL - Kafka consumer lag #{consumerlag_value} for topic #{topic} exceeds the threshold of #{crit_threshold}! | consumer_lag=#{consumerlag_value};;;;"
-      exit 2
-    elsif status == 'warning'
-      puts "WARNING - Kafka consumer lag #{consumerlag_value} for topic #{topic} exceeds the threshold of #{warn_threshold}! | consumer_lag=#{consumerlag_value};;;;"
-      exit 1
-    else
-      puts "OK - Kafka consumer lag is #{consumerlag_value} for topic #{topic} | consumer_lag=#{consumerlag_value};;;;"
-    end
+  def nagios_print_critical
+    print "CRITICAL - Kafka consumer lag #{consumerlag_value} for topic #{topic}"
+    print "exceeds the threshold of #{crit_threshold}! | consumer_lag=#{consumerlag_value};;;;\n"
+    exit 2
+  end
+
+  def nagios_print_warning
+    print "WARNING - Kafka consumer lag #{consumerlag_value} for topic #{topic} "
+    print "exceeds the threshold of #{warn_threshold}! | consumer_lag=#{consumerlag_value};;;;\n"
+    exit 1
+  end
+
+  def nagios_print_ok
+    print "OK - Kafka consumer lag is #{consumerlag_value} for topic #{topic} |"
+    print " consumer_lag=#{consumerlag_value};;;;\n"
   end
 
   def help
@@ -98,10 +104,10 @@ opts.each do |opt, arg|
   end
 end
 
-if i.get_lag > i.crit_threshold
-  i.nagios_print('critical')
-elsif i.get_lag > i.warn_threshold
-  i.nagios_print('warning')
+if i.lag > i.crit_threshold
+  i.nagios_print_critical
+elsif i.lag > i.warn_threshold
+  i.nagios_print_warning
 else
-  i.nagios_print('normal')
+  i.nagios_print_ok
 end
