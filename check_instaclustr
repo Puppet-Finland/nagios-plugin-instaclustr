@@ -10,6 +10,7 @@ class InstaClustrMetrics
   # rubocop:disable Metrics/MethodLength
   def initialize(settings = {})
     validate_thresholds(settings[:warn], settings[:critical])
+    validate_metric(settings[:metric])
 
     @host = settings[:host]
     @cluster_id = settings[:cluster_id]
@@ -29,6 +30,20 @@ class InstaClustrMetrics
   def validate_thresholds(warn, critical)
     if warn >= critical
       puts "ERROR: warning threshold can't be higher than critical threshold!"
+      exit 3
+    end
+    true
+  end
+
+  def validate_metric(metric)
+    valid_metrics = %i[cpuUtilization osload diskUtilization cpuguestpercent cpuguestnicepercent cpusystempercent \
+                       cpuiowaitpercent cpuirqpercent cpunicepercent cpusoftirqpercent cpustealpercent \
+                       cpuuserpercent]
+
+    unless valid_metrics.include?(metric.to_sym)
+      puts "ERROR: invalid metric \"#{metric}!\" Supported metrics: #{valid_metrics.join(', ')}."
+      puts
+      puts 'For details see https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/#'
       exit 3
     end
     true
