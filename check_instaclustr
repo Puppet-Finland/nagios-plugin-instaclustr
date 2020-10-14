@@ -7,25 +7,19 @@ require 'getoptlong'
 
 # https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
 class InstaClustrMetrics
-  # rubocop:disable Metrics/MethodLength
   def initialize(settings = {})
     validate_thresholds(settings[:warn], settings[:critical])
     validate_metric(settings[:metric])
 
-    @host = settings[:host]
-    @cluster_id = settings[:cluster_id]
-    @user = settings[:user]
-    @password = settings[:password]
-    @metric = settings[:metric]
-    @warn = settings[:warn]
-    @critical = settings[:critical]
+    settings.each do |k, v|
+      instance_variable_set("@#{k}", v)
+    end
+
     @precision = 1
     @uom = '%'
-    @debug = settings[:debug]
     @values = {}
     @status = 'UNKNOWN'
   end
-  # rubocop:enable Metrics/MethodLength
 
   def validate_thresholds(warn, critical)
     if warn >= critical
