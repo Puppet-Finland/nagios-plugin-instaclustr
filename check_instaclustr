@@ -8,14 +8,13 @@ require 'getoptlong'
 # Monitor Instaclustr (Kafka)
 class InstaClustrMetrics
   def initialize(settings = {})
-    # See https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/#'
-    set_metrics
-    validate_thresholds(settings[:warn], settings[:critical])
-    validate_metric(settings[:metric])
-
     settings.each do |k, v|
       instance_variable_set("@#{k}", v)
     end
+
+    set_metrics
+    validate_thresholds(settings[:warn], settings[:critical])
+    validate_metric(settings[:metric])
 
     @precision = 1
     @uom = @metrics[@metric.to_sym]
@@ -34,8 +33,8 @@ class InstaClustrMetrics
   end
 
   def validate_thresholds(warn, critical)
-    if warn >= critical
-      puts "ERROR: warning threshold can't be higher than critical threshold!"
+    if (warn >= critical && !@reverse) || (warn <= critical && @reverse)
+      puts 'ERROR: warning threshold and critical thresholds mixed up?'
       exit 3
     end
     true
@@ -53,7 +52,7 @@ class InstaClustrMetrics
 
   def to_s
     output = "Host: #{@host}\nCluster ID: #{@cluster_id}\nUser: #{@user}\nPassword: #{@password}\nMetric: #{@metric}\n"
-    output += "Warn threshold: #{@warn}\nCritical threshold: #{@critical}\nPrecision: #{@precision}"
+    output += "Warn threshold: #{@warn}\nCritical threshold: #{@critical}\nPrecision: #{@precision}\n"
     output
   end
 
@@ -70,9 +69,9 @@ class InstaClustrMetrics
   end
 
   def output_and_exit
-    if average_value >= @critical
+    if (average_value >= @critical && !@reverse) || (average_value <= @critical && @reverse)
       nagios_print(2, 'CRITICAL')
-    elsif average_value >= @warn
+    elsif (average_value >= @warn && !@reverse) || (average_value <= @warn && @reverse)
       nagios_print(1, 'WARNING')
     else
       nagios_print(0, 'OK')
@@ -137,7 +136,7 @@ end
 
 def help
   print 'Usage: ./check_instaclustr -H api.instaclustr.com -u <instaclustr-username> -p <password> '
-  puts '-C <cluster-id> -m <metric> -w <warn_threshold> -c <critical_threshold> [-d]'
+  puts '-C <cluster-id> -m <metric> -w <warn_threshold> -c <critical_threshold> [-r] [-d]'
   exit 0
 end
 
@@ -150,6 +149,7 @@ opts = GetoptLong.new(
   ['--metric', '-m', GetoptLong::REQUIRED_ARGUMENT],
   ['--warn', '-w', GetoptLong::REQUIRED_ARGUMENT],
   ['--critical', '-c', GetoptLong::REQUIRED_ARGUMENT],
+  ['--reverse', '-r', GetoptLong::NO_ARGUMENT],
   ['--user', '-u', GetoptLong::REQUIRED_ARGUMENT],
   ['--password', '-p', GetoptLong::REQUIRED_ARGUMENT],
   ['--debug', '-d', GetoptLong::NO_ARGUMENT]
@@ -172,6 +172,8 @@ opts.each do |opt, arg|
       settings[:warn] = arg.to_f
     when '--critical', '-c'
       settings[:critical] = arg.to_f
+    when '--reverse', '-r'
+      settings[:reverse] = true
     when '--user', '-u'
       settings[:user] = arg
     when '--password', '-p'
@@ -185,7 +187,6 @@ opts.each do |opt, arg|
 end
 
 # Check that all mandatory command-line parameters are given
-
 params_ok = true
 %i[host cluster_id user password metric warn critical].each do |parameter|
   unless settings.key?(parameter)
@@ -199,6 +200,8 @@ unless params_ok
   help
   exit 3
 end
+
+settings.merge!(reverse: false) unless settings[:reverse]
 
 i = InstaClustrMetrics.new(settings)
 i.run
