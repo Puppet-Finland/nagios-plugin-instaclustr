@@ -5,19 +5,11 @@ require 'rest-client'
 require 'json'
 require 'getoptlong'
 
-# https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
+# Monitor Instaclustr (Kafka)
 class InstaClustrMetrics
   def initialize(settings = {})
     # See https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/#'
-    @metrics = { cpuUtilization: '%', osload: '%', diskUtilization: '%', cpuguestpercent: '%', \
-                 cpuguestnicepercent: '%', cpusystempercent: '%', cpuiowaitpercent: '%', \
-                 cpuirqpercent: '%', cpunicepercent: '%', cpusoftirqpercent: '%', \
-                 cpustealpercent: '%', cpuuserpercent: '%', memavailable: 'B', networkoutdelta: 'c', \
-                 networkindelta: 'c', networkouterrorsdelta: 'c', networkinerrorsdelta: 'c', \
-                 networkoutdroppeddelta: 'c', networkindroppeddelta: 'c', tcpall: nil, tcpestablished: nil, \
-                 tcplistening: nil, tcptimewait: nil, tcpclosewait: nil, filedescriptorlimit: nil, \
-                 filedescriptoropencount: nil, cpuidlepercent: '%' }
-
+    set_metrics
     validate_thresholds(settings[:warn], settings[:critical])
     validate_metric(settings[:metric])
 
@@ -28,7 +20,17 @@ class InstaClustrMetrics
     @precision = 1
     @uom = @metrics[@metric.to_sym]
     @values = {}
-    @status = 'UNKNOWN'
+  end
+
+  def set_metrics
+    @metrics = { cpuUtilization: '%', osload: '%', diskUtilization: '%', cpuguestpercent: '%', \
+                 cpuguestnicepercent: '%', cpusystempercent: '%', cpuiowaitpercent: '%', \
+                 cpuirqpercent: '%', cpunicepercent: '%', cpusoftirqpercent: '%', \
+                 cpustealpercent: '%', cpuuserpercent: '%', memavailable: 'B', networkoutdelta: 'c', \
+                 networkindelta: 'c', networkouterrorsdelta: 'c', networkinerrorsdelta: 'c', \
+                 networkoutdroppeddelta: 'c', networkindroppeddelta: 'c', tcpall: nil, tcpestablished: nil, \
+                 tcplistening: nil, tcptimewait: nil, tcpclosewait: nil, filedescriptorlimit: nil, \
+                 filedescriptoropencount: nil, cpuidlepercent: '%' }
   end
 
   def validate_thresholds(warn, critical)
@@ -50,14 +52,8 @@ class InstaClustrMetrics
   end
 
   def to_s
-    output = "Host: #{@host}\n"
-    output += "Cluster ID: #{@cluster_id}\n"
-    output += "User: #{@user}\n"
-    output += "Password: #{@password}\n"
-    output += "Metric: #{@metric}\n"
-    output += "Warn threshold: #{@warn}\n"
-    output += "Critical threshold: #{@critical}\n"
-    output += "Precision: #{@precision}"
+    output = "Host: #{@host}\nCluster ID: #{@cluster_id}\nUser: #{@user}\nPassword: #{@password}\nMetric: #{@metric}\n"
+    output += "Warn threshold: #{@warn}\nCritical threshold: #{@critical}\nPrecision: #{@precision}"
     output
   end
 
@@ -75,14 +71,11 @@ class InstaClustrMetrics
 
   def output_and_exit
     if average_value >= @critical
-      @status = 'CRITICAL'
-      nagios_print(2)
+      nagios_print(2, 'CRITICAL')
     elsif average_value >= @warn
-      @status = 'WARNING'
-      nagios_print(1)
+      nagios_print(1, 'WARNING')
     else
-      @status = 'OK'
-      nagios_print(0)
+      nagios_print(0, 'OK')
     end
   end
 
@@ -129,15 +122,15 @@ class InstaClustrMetrics
     output.chomp
   end
 
-  def perf_summary
+  def perf_summary(status)
     output = ''
-    output += "InstaClustr cluster #{short_id(@cluster_id)} #{@status} - "
+    output += "InstaClustr cluster #{short_id(@cluster_id)} #{status} - "
     output += "average #{@metric} is #{average_value}#{@uom}"
     output
   end
 
-  def nagios_print(exit_code)
-    puts "#{perf_summary} | #{perf_data}"
+  def nagios_print(exit_code, status)
+    puts "#{perf_summary(status)} | #{perf_data}"
     exit exit_code
   end
 end
