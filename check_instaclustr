@@ -1,0 +1,196 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'rest-client'
+require 'json'
+require 'getoptlong'
+
+# https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
+class InstaClustrMetrics
+  # rubocop:disable Metrics/MethodLength
+  def initialize(settings = {})
+    validate_thresholds(settings[:warn], settings[:critical])
+
+    @host = settings[:host]
+    @cluster_id = settings[:cluster_id]
+    @user = settings[:user]
+    @password = settings[:password]
+    @metric = settings[:metric]
+    @warn = settings[:warn]
+    @critical = settings[:critical]
+    @precision = 1
+    @uom = '%'
+    @debug = settings[:debug]
+    @values = {}
+    @status = 'UNKNOWN'
+  end
+  # rubocop:enable Metrics/MethodLength
+
+  def validate_thresholds(warn, critical)
+    if warn >= critical
+      puts "ERROR: warning threshold can't be higher than critical threshold!"
+      exit 3
+    end
+    true
+  end
+
+  def to_s
+    output = "Host: #{@host}\n"
+    output += "Cluster ID: #{@cluster_id}\n"
+    output += "User: #{@user}\n"
+    output += "Password: #{@password}\n"
+    output += "Metric: #{@metric}\n"
+    output += "Warn threshold: #{@warn}\n"
+    output += "Critical threshold: #{@critical}\n"
+    output += "Precision: #{@precision}"
+    output
+  end
+
+  def call_instaclustr_api
+    response = RestClient::Request.new(
+      method: :get,
+      url: "https://#{@host}/monitoring/v1/clusters/#{@cluster_id}?metrics=n::#{@metric}",
+      user: @user,
+      password: @password,
+      verify_ssl: true
+    ).execute
+
+    JSON.parse(response.to_str)
+  end
+
+  def output_and_exit
+    if average_value >= @critical
+      @status = 'CRITICAL'
+      nagios_print(2)
+    elsif average_value >= @warn
+      @status = 'WARNING'
+      nagios_print(1)
+    else
+      @status = 'OK'
+      nagios_print(0)
+    end
+  end
+
+  def run
+    puts self if @debug
+
+    results = call_instaclustr_api
+
+    # This will generate a hash with a shortened node ID plus the associated metric value. For example:
+    #
+    # {"e3f16af4"=>2.578361981799798, "2b68c8c2"=>2.176113360323887, "93badc20"=>4.29726996966633}
+    #
+    results.each do |result|
+      @values[short_id(result['id'])] = result['payload'][0]['values'][0]['value'].to_f.round(@precision)
+    end
+
+    p @values if @debug
+
+    output_and_exit
+  end
+
+  def short_id(long_id)
+    long_id.split('-')[0]
+  end
+
+  def average_value
+    sum = 0
+    @values.each do |_node, value|
+      sum += value
+    end
+    (sum / @values.length).round(@precision)
+  end
+
+  # Generate perf data line. This plugin determines alert status using exit values so performance data
+  # does not output warning and critical thresholds in the rather complex "Range and threshold" schema:
+  #
+  # <https://nagios-plugins.org/doc/guidelines.html#THRESHOLDFORMAT>
+  def perf_data
+    output = ''
+
+    @values.each do |node, value|
+      output += "#{@metric}_#{short_id(node)}=#{value}#{@uom};;;; "
+    end
+    output.chomp
+  end
+
+  def perf_summary
+    output = ''
+    output += "InstaClustr cluster #{short_id(@cluster_id)} #{@status} - "
+    output += "average #{@metric} is #{average_value}#{@uom}"
+    output
+  end
+
+  def nagios_print(exit_code)
+    puts "#{perf_summary} | #{perf_data}"
+    exit exit_code
+  end
+end
+
+def help
+  print 'Usage: ./check_instaclustr -H api.instaclustr.com -u <instaclustr-username> -p <password> '
+  puts '-C <cluster-id> -m <metric> -w <warn_threshold> -c <critical_threshold> [-d]'
+  exit 0
+end
+
+help if ARGV.empty?
+
+opts = GetoptLong.new(
+  ['--host', '-H', GetoptLong::REQUIRED_ARGUMENT],
+  ['--cluster_id', '-C', GetoptLong::REQUIRED_ARGUMENT],
+  ['--help', '-h', GetoptLong::NO_ARGUMENT],
+  ['--metric', '-m', GetoptLong::REQUIRED_ARGUMENT],
+  ['--warn', '-w', GetoptLong::REQUIRED_ARGUMENT],
+  ['--critical', '-c', GetoptLong::REQUIRED_ARGUMENT],
+  ['--user', '-u', GetoptLong::REQUIRED_ARGUMENT],
+  ['--password', '-p', GetoptLong::REQUIRED_ARGUMENT],
+  ['--debug', '-d', GetoptLong::NO_ARGUMENT]
+)
+
+settings = {}
+
+opts.each do |opt, arg|
+  begin
+    case opt
+    when '--help', '-h'
+      help
+    when '--host', '-H'
+      settings[:host] = arg
+    when '--cluster_id', '-C'
+      settings[:cluster_id] = arg
+    when '--metric', '-m'
+      settings[:metric] = arg
+    when '--warn', '-w'
+      settings[:warn] = arg.to_f
+    when '--critical', '-c'
+      settings[:critical] = arg.to_f
+    when '--user', '-u'
+      settings[:user] = arg
+    when '--password', '-p'
+      settings[:password] = arg
+    when '--debug', '-d'
+      settings[:debug] = true
+    else
+      help
+    end
+  end
+end
+
+# Check that all mandatory command-line parameters are given
+
+params_ok = true
+%i[host cluster_id user password metric warn critical].each do |parameter|
+  unless settings.key?(parameter)
+    puts "ERROR: Required parameter --#{parameter} is missing!"
+    params_ok = false
+  end
+end
+
+unless params_ok
+  puts
+  help
+  exit 3
+end
+
+i = InstaClustrMetrics.new(settings)
+i.run
