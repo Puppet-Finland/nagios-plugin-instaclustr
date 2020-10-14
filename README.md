@@ -5,7 +5,7 @@ This project contains Nagios plugins that gets metrics from
 provided for graphing purposes. The current plugins:
 
 * check_consumerlag: monitor Kafka consumerlag
-* check_instaclustr: monitor performance metrics (e.g. cpuUtilization) of nodes in a Kafka cluster
+* check_instaclustr: monitor performance metrics (e.g. cpuUtilization) of nodes in a Kafka cluster. Alerts will be generated based on average value of the metric.
 
 # Prerequisites
 
@@ -32,13 +32,17 @@ Plugin output is based on the format described here:
 
 * https://nagios-plugins.org/doc/guidelines.html#AEN200
 
-When no thresholds are exceeded the output will be similar to this:
+When no thresholds are exceeded with check_consumerlag:
 
     OK - Kafka consumer lag is 6 for topic my_topic | consumer_lag=6;;;;
 
 In case of warnings and/or errors the first part of the output looks different:
 
     CRITICAL - Kafka consumer lag 1453 for topic my_topic exceeds the threshold of 600! | consumer_lag=1453;;;;
+
+Output of check_instaclustr will be like this:
+
+    InstaClustr cluster 21cd9dab OK - average cpuUtilization is 2.1% | cpuUtilization_5af74cb2=1.6%;;;; cpuUtilization_7b28ca31=1.9%;;;; cpuUtilization_b521da41=2.8%;;;;
 
 # LICENSE
 
