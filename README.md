@@ -1,10 +1,11 @@
 # nagios-plugin-instraclustr
 
-This is a Nagios plugin that gets metrics from [Instaclustr](https://www.instaclustr.com)
-using API calls. Performance data is provided for graphing purposes.
+This project contains Nagios plugins that gets metrics from
+[Instaclustr](https://www.instaclustr.com) using API calls. Performance data is
+provided for graphing purposes. The current plugins:
 
-Right now only Kafka consumerlag is supported, but support for additional
-metrics will be easy to add.
+* check_consumerlag: monitor Kafka consumerlag
+* check_instaclustr: monitor performance metrics (e.g. cpuUtilization) of nodes in a Kafka cluster
 
 # Prerequisites
 
@@ -20,7 +21,10 @@ the gem as rest-client requires building Ruby native extensions.
 
 All parameters are passed on the command-line
 
-    ./check_consumerlag -H api.instaclustr.com -w 300 -c 600 -u <instaclustr-username> -p <password> -C <cluster-id> -g <consumer-group> -t <topic> -i <client-id>
+    ./check_consumerlag -H api.instaclustr.com -u <instaclustr-username> -p <password> -C <cluster-id> -g <consumer-group> -t <topic> -i <client-id> -w 300 -c 600
+    ./check_instaclustr -H api.instaclustr.com -u <instaclustr-username> -p <password> -C <cluster-id> -m <metric> -w 50 -c 80
+
+For further information run the scripts without arguments or with "-h" or "--help".
 
 # Plugin output
 
