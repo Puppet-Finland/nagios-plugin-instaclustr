@@ -8,6 +8,16 @@ require 'getoptlong'
 # https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
 class InstaClustrMetrics
   def initialize(settings = {})
+    # See https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/#'
+    @metrics = { cpuUtilization: '%', osload: '%', diskUtilization: '%', cpuguestpercent: '%', \
+                 cpuguestnicepercent: '%', cpusystempercent: '%', cpuiowaitpercent: '%', \
+                 cpuirqpercent: '%', cpunicepercent: '%', cpusoftirqpercent: '%', \
+                 cpustealpercent: '%', cpuuserpercent: '%', memavailable: 'B', networkoutdelta: 'c', \
+                 networkindelta: 'c', networkouterrorsdelta: 'c', networkinerrorsdelta: 'c', \
+                 networkoutdroppeddelta: 'c', networkindroppeddelta: 'c', tcpall: nil, tcpestablished: nil, \
+                 tcplistening: nil, tcptimewait: nil, tcpclosewait: nil, filedescriptorlimit: nil, \
+                 filedescriptoropencount: nil, cpuidlepercent: '%' }
+
     validate_thresholds(settings[:warn], settings[:critical])
     validate_metric(settings[:metric])
 
@@ -16,7 +26,7 @@ class InstaClustrMetrics
     end
 
     @precision = 1
-    @uom = '%'
+    @uom = @metrics[@metric.to_sym]
     @values = {}
     @status = 'UNKNOWN'
   end
@@ -30,12 +40,8 @@ class InstaClustrMetrics
   end
 
   def validate_metric(metric)
-    valid_metrics = %i[cpuUtilization osload diskUtilization cpuguestpercent cpuguestnicepercent cpusystempercent \
-                       cpuiowaitpercent cpuirqpercent cpunicepercent cpusoftirqpercent cpustealpercent \
-                       cpuuserpercent]
-
-    unless valid_metrics.include?(metric.to_sym)
-      puts "ERROR: invalid metric \"#{metric}!\" Supported metrics: #{valid_metrics.join(', ')}."
+    unless @metrics.key?(metric.to_sym)
+      puts "ERROR: invalid metric \"#{metric}!\" Supported metrics: #{@metrics.keys.join(', ')}."
       puts
       puts 'For details see https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/#'
       exit 3
