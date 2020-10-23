@@ -7,51 +7,61 @@ require 'getoptlong'
 
 # Nagios plugin for getting metrics from InstaClustr
 class InstaClustrMetrics
-  attr_accessor :consumerlag_value, :timeout, :hostname, :user, :password, :warn_threshold, :crit_threshold
+  attr_accessor :value, :timeout, :hostname, :user, :password, :warn_threshold, :crit_threshold
 
   # See https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/kafka-metrics/
-  attr_accessor :cluster_id, :consumer_group, :client_id, :topic
+  attr_accessor :metric, :cluster_id, :consumer_group, :client_id, :topic
 
-  def connect(metrics)
+  def initialize
+    @valid_metrics = ['consumercount','consumerlag','partitioncount']
+  end
+
+  def validate_metric
+    @valid_metrics.include?(@metric.downcase)
+  end
+
+  def connect
     response = RestClient::Request.new(
       method: :get,
-      url: "https://#{@hostname}/monitoring/v1/clusters/#{@cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{@consumer_group}&topic=#{topic}&metrics=#{metrics}&clientID=#{@client_id}", # rubocop:disable Layout/LineLength
+      url: "https://#{@hostname}/monitoring/v1/clusters/#{@cluster_id}/kafka/consumerGroupClientMetrics?consumerGroup=#{@consumer_group}&topic=#{topic}&metrics=#{@metric}&clientID=#{@client_id}", # rubocop:disable Layout/LineLength
       user: @user,
       password: @password,
       verify_ssl: true
     ).execute
 
     results = JSON.parse(response.to_str)
-    self.consumerlag_value = results[0]['payload'][0]['values'][0]['value'].to_i
+    @value = results[0]['payload'][0]['values'][0]['value'].to_i
   end
 
-  def lag
-    connect('consumerlag')
-    consumerlag_value
+  def result
+    connect
+    @value
   end
 
   def nagios_print_critical
-    print "CRITICAL - Kafka consumer lag #{consumerlag_value} for topic #{topic} "
-    print "exceeds the threshold of #{crit_threshold}! | consumer_lag=#{consumerlag_value};;;;\n"
+    print "CRITICAL - Kafka #{@metric} #{@value} for topic #{topic} "
+    print "exceeds the threshold of #{crit_threshold}! | #{@metric}=#{@value};;;;\n"
     exit 2
   end
 
   def nagios_print_warning
-    print "WARNING - Kafka consumer lag #{consumerlag_value} for topic #{topic} "
-    print "exceeds the threshold of #{warn_threshold}! | consumer_lag=#{consumerlag_value};;;;\n"
+    print "WARNING - Kafka #{@metric} #{@value} for topic #{topic} "
+    print "exceeds the threshold of #{warn_threshold}! | #{@metric}=#{@value};;;;\n"
     exit 1
   end
 
   def nagios_print_ok
-    print "OK - Kafka consumer lag is #{consumerlag_value} for topic #{topic} |"
-    print " consumer_lag=#{consumerlag_value};;;;\n"
+    print "OK - Kafka #{@metric} is #{@value} for topic #{topic} |"
+    print " #{@metric}=#{@value};;;;\n"
   end
 end
 
-def help
-  print 'Usage: ./check_consumerlag -H api.instaclustr.com -w 300 -c 600 -u <instaclustr-username> -p <password> '
-  print '-C <cluster-id> -g <consumer-group> -t <topic> -i <client-id>'
-  exit 0
+def help(retval=0)
+  print 'Usage: ./check_consumergroupclient -H api.instaclustr.com -w 300 -c 600 -u <instaclustr-username> -p <password> '
+  print '-C <cluster-id> -g <consumer-group> -t <topic> -i <client-id> -m <metric>'
+  puts
+  puts 'Valid metrics are consumercount, consumerlag and partitioncount.'
+  exit retval
 end
 
 help if ARGV.empty?
@@ -66,7 +76,8 @@ opts = GetoptLong.new(
   ['--cluster_id', '-C', GetoptLong::REQUIRED_ARGUMENT],
   ['--consumer_group', '-g', GetoptLong::REQUIRED_ARGUMENT],
   ['--client_id', '-i', GetoptLong::REQUIRED_ARGUMENT],
-  ['--topic', '-t', GetoptLong::REQUIRED_ARGUMENT]
+  ['--topic', '-t', GetoptLong::REQUIRED_ARGUMENT],
+  ['--metric', '-m', GetoptLong::REQUIRED_ARGUMENT]
 )
 
 i = InstaClustrMetrics.new
@@ -94,13 +105,19 @@ opts.each do |opt, arg|
       i.client_id = arg
     when '--topic', '-T'
       i.topic = arg
+    when '--metric', '-m'
+      i.metric = arg
     end
   end
 end
 
-if i.lag > i.crit_threshold
+unless i.validate_metric
+  help(3)
+end
+
+if i.result > i.crit_threshold
   i.nagios_print_critical
-elsif i.lag > i.warn_threshold
+elsif i.result > i.warn_threshold
   i.nagios_print_warning
 else
   i.nagios_print_ok

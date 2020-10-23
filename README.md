@@ -4,8 +4,8 @@ This project contains Nagios plugins that gets metrics from
 [Instaclustr](https://www.instaclustr.com) using API calls. Performance data is
 provided for graphing purposes. The current plugins:
 
-* check_consumerlag: monitor Kafka consumerlag
-* check_instaclustr: monitor performance metrics (e.g. cpuUtilization) of nodes in a Kafka cluster. Alerts will be generated based on average value of the metric.
+* check_consumergroupclient: monitor Kafka consumer group client metrics
+* check_instaclustr: monitor performance metrics (e.g. cpuUtilization) of nodes in a Kafka cluster. Performance data will be created for each node separately, but alerts will be generated based on average value of their metrics.
 
 # Prerequisites
 
@@ -21,10 +21,53 @@ the gem as rest-client requires building Ruby native extensions.
 
 All parameters are passed on the command-line
 
-    ./check_consumerlag -H api.instaclustr.com -u <instaclustr-username> -p <password> -C <cluster-id> -g <consumer-group> -t <topic> -i <client-id> -w 300 -c 600
+    ./check_consumergroupclient -H api.instaclustr.com -u <instaclustr-username> -p <password> -C <cluster-id> -g <consumer-group> -t <topic> -i <client-id> -w 300 -c 600 -m consumerlag
     ./check_instaclustr -H api.instaclustr.com -u <instaclustr-username> -p <password> -C <cluster-id> -m <metric> -w 50 -c 80
 
+If the metric you're tracking is such that low values are bad (e.g. memavailable) then you can use "-r" to reverse alerting logic. For example:
+
+    ./check_instaclustr -H api.instaclustr.com -u <instaclustr-username> -p <password> -C <cluster-id> -m memavailable -w 30000 -c 10000 -r
+
 For further information run the scripts without arguments or with "-h" or "--help".
+
+# Valid metric names
+
+These plugins validate metric names before making the API calls. Valid values are taken from the InstaClustr's
+[Monitoring API documentation](https://www.instaclustr.com/support/api-integrations/api-reference/monitoring-api/#),
+but for convenience they're listed here:
+
+* check_consumergroupclient
+    * consumercount (integer)
+    * consumerlag (integer)
+    * partitioncount (integer)
+* check_instaclustr
+    * cpuUtilization (%)
+    * osload (%)
+    * diskUtilization (%)
+    * cpuguestpercent (%)
+    * cpuguestnicepercent (%)
+    * cpusystempercent (%)
+    * cpuiowaitpercent (%)
+    * cpuirqpercent (%)
+    * cpunicepercent (%)
+    * cpusoftirqpercent (%)
+    * cpustealpercent (%)
+    * cpuuserpercent (%)
+    * memavailable (kilobytes?)
+    * networkoutdelta (counter)
+    * networkindelta (counter)
+    * networkouterrorsdelta (counter)
+    * networkinerrorsdelta (counter)
+    * networkoutdroppeddelta (counter)
+    * networkindroppeddelta (counter)
+    * tcpall (integer)
+    * tcpestablished (integer)
+    * tcplistening (integer)
+    * tcptimewait (integer)
+    * tcpclosewait (integer)
+    * filedescriptorlimit (integer)
+    * filedescriptoropencount (integer)
+    * cpuidlepercent (%)
 
 # Plugin output
 
@@ -32,13 +75,13 @@ Plugin output is based on the format described here:
 
 * https://nagios-plugins.org/doc/guidelines.html#AEN200
 
-When no thresholds are exceeded with check_consumerlag:
+When no thresholds are exceeded with check_consumergroupclient:
 
-    OK - Kafka consumer lag is 6 for topic my_topic | consumer_lag=6;;;;
+    OK - Kafka consumerlag is 6 for topic my_topic | consumerlag=6;;;;
 
 In case of warnings and/or errors the first part of the output looks different:
 
-    CRITICAL - Kafka consumer lag 1453 for topic my_topic exceeds the threshold of 600! | consumer_lag=1453;;;;
+    CRITICAL - Kafka consumerlag 1453 for topic my_topic exceeds the threshold of 600! | consumerlag=1453;;;;
 
 Output of check_instaclustr will be like this:
 
