@@ -69,6 +69,8 @@ but for convenience they're listed here:
     * filedescriptoropencount (integer)
     * cpuidlepercent (%)
 
+Please note that the identical metrics can be queried for both Kafka and Cassandra clusters with check_instaclustr. 
+
 # Plugin output
 
 Plugin output is based on the format described here:
