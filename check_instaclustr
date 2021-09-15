@@ -87,8 +87,13 @@ class InstaClustrMetrics
     #
     # {"e3f16af4"=>2.578361981799798, "2b68c8c2"=>2.176113360323887, "93badc20"=>4.29726996966633}
     #
-    results.each do |result|
-      @values[short_id(result['id'])] = result['payload'][0]['values'][0]['value'].to_f.round(@precision)
+    begin
+      results.each do |result|
+        @values[short_id(result['id'])] = result['payload'][0]['values'][0]['value'].to_f.round(@precision)
+      end
+    rescue NoMethodError
+      puts api_down_message
+      exit 1
     end
 
     p @values if @debug
@@ -119,6 +124,10 @@ class InstaClustrMetrics
       output += "#{@metric}_#{short_id(node)}=#{value}#{@uom};;;; "
     end
     output.chomp
+  end
+
+  def api_down_message
+    "InstaClustr cluster #{short_id(@cluster_id)} WARNING - unparseable response from the Monitoring API"
   end
 
   def perf_summary(status)
