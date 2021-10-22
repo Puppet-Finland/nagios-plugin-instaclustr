@@ -69,12 +69,22 @@ class InstaClustrMetrics
   end
 
   def output_and_exit
-    if (average_value >= @critical && !@reverse) || (average_value <= @critical && @reverse)
-      nagios_print(2, 'CRITICAL')
-    elsif (average_value >= @warn && !@reverse) || (average_value <= @warn && @reverse)
-      nagios_print(1, 'WARNING')
+    if @high
+      if (high_value >= @critical && !@reverse) || (high_value <= @critical && @reverse)
+        nagios_print(2, 'CRITICAL')
+      elsif (high_value >= @warn && !@reverse) || (high_value <= @warn && @reverse)
+        nagios_print(1, 'WARNING')
+      else
+        nagios_print(0, 'OK')
+      end
     else
-      nagios_print(0, 'OK')
+      if (average_value >= @critical && !@reverse) || (average_value <= @critical && @reverse)
+        nagios_print(2, 'CRITICAL')
+      elsif (average_value >= @warn && !@reverse) || (average_value <= @warn && @reverse)
+        nagios_print(1, 'WARNING')
+      else
+        nagios_print(0, 'OK')
+      end
     end
   end
 
@@ -113,6 +123,16 @@ class InstaClustrMetrics
     (sum / @values.length).round(@precision)
   end
 
+  def high_value
+    high = -1
+    @values.each do |_node, value|
+      if value > high
+        high = value
+      end
+    end
+    high
+  end
+
   # Generate perf data line. This plugin determines alert status using exit values so performance data
   # does not output warning and critical thresholds in the rather complex "Range and threshold" schema:
   #
@@ -133,7 +153,8 @@ class InstaClustrMetrics
   def perf_summary(status)
     output = ''
     output += "InstaClustr cluster #{short_id(@cluster_id)} #{status} - "
-    output += "average #{@metric} is #{average_value}#{@uom}"
+    @high ? output += "highest #{@metric} is #{high_value}#{@uom}" :
+            output += "average #{@metric} is #{average_value}#{@uom}"
     output
   end
 
@@ -159,6 +180,7 @@ opts = GetoptLong.new(
   ['--warn', '-w', GetoptLong::REQUIRED_ARGUMENT],
   ['--critical', '-c', GetoptLong::REQUIRED_ARGUMENT],
   ['--reverse', '-r', GetoptLong::NO_ARGUMENT],
+  ['--high', '-i', GetoptLong::NO_ARGUMENT],
   ['--user', '-u', GetoptLong::REQUIRED_ARGUMENT],
   ['--password', '-p', GetoptLong::REQUIRED_ARGUMENT],
   ['--debug', '-d', GetoptLong::NO_ARGUMENT]
@@ -183,6 +205,8 @@ opts.each do |opt, arg|
       settings[:critical] = arg.to_f
     when '--reverse', '-r'
       settings[:reverse] = true
+    when '--high', '-i'
+      settings[:high] = true
     when '--user', '-u'
       settings[:user] = arg
     when '--password', '-p'
