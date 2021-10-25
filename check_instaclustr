@@ -70,7 +70,7 @@ class InstaClustrMetrics
 
   def output_and_exit
     if @high
-      if (high_value >= @critical && !@reverse) || (high_value <= @critical && @reverse)
+      if (high_value  >= @critical && !@reverse) || (high_value <= @critical && @reverse)
         nagios_print(2, 'CRITICAL')
       elsif (high_value >= @warn && !@reverse) || (high_value <= @warn && @reverse)
         nagios_print(1, 'WARNING')
@@ -115,14 +115,6 @@ class InstaClustrMetrics
     long_id.split('-')[0]
   end
 
-  def average_value
-    sum = 0
-    @values.each do |_node, value|
-      sum += value
-    end
-    (sum / @values.length).round(@precision)
-  end
-
   def high_value
     high = -1
     @values.each do |_node, value|
@@ -131,6 +123,14 @@ class InstaClustrMetrics
       end
     end
     high
+  end
+
+  def average_value
+    sum = 0
+    @values.each do |_node, value|
+      sum += value
+    end
+    (sum / @values.length).round(@precision)
   end
 
   # Generate perf data line. This plugin determines alert status using exit values so performance data
@@ -153,7 +153,7 @@ class InstaClustrMetrics
   def perf_summary(status)
     output = ''
     output += "InstaClustr cluster #{short_id(@cluster_id)} #{status} - "
-    @high ? output += "highest #{@metric} is #{high_value}#{@uom}" :
+    @high ? output += "worst #{@metric} is #{high_value}#{@uom}" :
             output += "average #{@metric} is #{average_value}#{@uom}"
     output
   end
